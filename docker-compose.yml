@@ -21,7 +21,7 @@ services:
     networks:
       - claper-net
   app:
-    # image: ghcr.io/claperco/claper:latest # or build: .
+    image: ghcr.io/albertkun/claper:latest # or build: .
     build: .
     ports:
       - 4000:4000

@@ -12,5 +12,5 @@ mix assets.deploy
 # Build the release and overwrite the existing release directory
 MIX_ENV=prod mix release --overwrite
 
-# for auto DB migration upon deploy
+# for auto DB migration upon deploy now
 MIX_ENV=prod mix ecto.migrate 
