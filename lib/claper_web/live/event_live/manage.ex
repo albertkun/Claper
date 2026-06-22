@@ -1,7 +1,7 @@
 defmodule ClaperWeb.EventLive.Manage do
   use ClaperWeb, :live_view
 
-  alias Claper.{Embeds, Forms, Polls, Presentations, Quizzes}
+  alias Claper.{Embeds, Forms, Polls, Presentations, Quizzes, WordClouds}
   alias ClaperWeb.Presence
 
   @impl true
@@ -272,6 +272,21 @@ defmodule ClaperWeb.EventLive.Manage do
   end
 
   @impl true
+  def handle_info({:word_cloud_created, word_cloud}, socket) do
+    {:noreply, socket |> interactions_at_position(word_cloud.position)}
+  end
+
+  @impl true
+  def handle_info({:word_cloud_updated, word_cloud}, socket) do
+    {:noreply, socket |> interactions_at_position(word_cloud.position)}
+  end
+
+  @impl true
+  def handle_info({:word_cloud_deleted, word_cloud}, socket) do
+    {:noreply, socket |> interactions_at_position(word_cloud.position)}
+  end
+
+  @impl true
   def handle_info(
         {:current_interaction, interaction},
         socket
@@ -499,6 +514,60 @@ defmodule ClaperWeb.EventLive.Manage do
          socket
          |> assign(:current_interaction, nil)
          |> interactions_at_position(socket.assigns.state.position)}
+    end
+  end
+
+  def handle_event("word-cloud-set-active", %{"id" => id}, socket) do
+    case WordClouds.get_word_cloud_for_event(id, event_id(socket)) do
+      nil ->
+        {:noreply, socket}
+
+      word_cloud ->
+        with :ok <- Claper.Interactions.enable_interaction(word_cloud) do
+          Phoenix.PubSub.broadcast(
+            Claper.PubSub,
+            "event:#{socket.assigns.event.uuid}",
+            {:current_interaction, word_cloud}
+          )
+
+          {:noreply,
+           socket
+           |> assign(:current_interaction, word_cloud)
+           |> interactions_at_position(socket.assigns.state.position)}
+        end
+    end
+  end
+
+  def handle_event("word-cloud-set-inactive", %{"id" => id}, socket) do
+    case WordClouds.get_word_cloud_for_event(id, event_id(socket)) do
+      nil ->
+        {:noreply, socket}
+
+      word_cloud ->
+        with {:ok, _} <- Claper.Interactions.disable_interaction(word_cloud) do
+          Phoenix.PubSub.broadcast(
+            Claper.PubSub,
+            "event:#{socket.assigns.event.uuid}",
+            {:current_interaction, nil}
+          )
+        end
+
+        {:noreply,
+         socket
+         |> assign(:current_interaction, nil)
+         |> interactions_at_position(socket.assigns.state.position)}
+    end
+  end
+
+  @impl true
+  def handle_event("delete-word-cloud", %{"id" => id}, socket) do
+    case WordClouds.get_word_cloud_for_event(id, event_id(socket)) do
+      nil ->
+        {:noreply, socket}
+
+      word_cloud ->
+        {:ok, _} = WordClouds.delete_word_cloud(socket.assigns.event.uuid, word_cloud)
+        {:noreply, socket}
     end
   end
 
@@ -1003,6 +1072,28 @@ defmodule ClaperWeb.EventLive.Manage do
         |> assign(:interaction_modal, true)
         |> assign(:create_action, :edit)
         |> assign(:quiz, quiz)
+    end
+  end
+
+  defp apply_action(socket, :add_word_cloud, _params) do
+    socket
+    |> assign(:create, "word_cloud")
+    |> assign(:word_cloud, %WordClouds.WordCloud{})
+  end
+
+  defp apply_action(socket, :edit_word_cloud, %{"id" => id}) do
+    case WordClouds.get_word_cloud_for_event(id, event_id(socket)) do
+      nil ->
+        socket
+        |> put_flash(:error, gettext("Resource not found"))
+        |> push_navigate(to: ~p"/e/#{socket.assigns.event.code}/manage")
+
+      word_cloud ->
+        socket
+        |> assign(:create, "word_cloud")
+        |> assign(:interaction_modal, true)
+        |> assign(:create_action, :edit)
+        |> assign(:word_cloud, word_cloud)
     end
   end
 

@@ -1,0 +1,49 @@
+<div>
+  <.form
+    :let={f}
+    for={@changeset}
+    id="word-cloud-form"
+    phx-target={@myself}
+    phx-change="validate"
+    phx-submit="save"
+  >
+    <div class="my-3 mb-5">
+      <ClaperWeb.Component.Input.text
+        form={f}
+        key={:title}
+        name={gettext("Prompt question (e.g. \"What word describes today?\")")}
+        autofocus="true"
+        required="true"
+      />
+    </div>
+
+    <div class="flex space-x-3 mt-5">
+      <button
+        type="submit"
+        phx_disable_with="Loading..."
+        class="w-full lg:w-auto px-6 text-white py-2 rounded-md tracking-wide font-bold focus:outline-hidden focus:shadow-outline bg-linear-to-tl from-primary-500 to-secondary-500 bg-size-[200%_200%] bg-position-[0%_0%] hover:bg-position-[100%_100%] transition-all duration-500"
+      >
+        {case @live_action do
+          :new -> gettext("Create")
+          :edit -> gettext("Save")
+        end}
+      </button>
+      <%= if @live_action == :edit do %>
+        {link(gettext("Delete"),
+          to: "#",
+          phx_click: "delete",
+          phx_target: @myself,
+          phx_value_id: @word_cloud.id,
+          data: [
+            confirm:
+              gettext(
+                "This will delete all responses and the word cloud itself, are you sure?"
+              )
+          ],
+          class:
+            "w-full lg:w-auto px-6 text-center text-white py-2 rounded-md tracking-wide font-bold focus:outline-hidden focus:shadow-outline bg-linear-to-tl from-supporting-red-600 to-supporting-red-400 bg-size-[200%_200%] bg-position-[0%_0%] hover:bg-position-[100%_100%] transition-all duration-500"
+        )}
+      <% end %>
+    </div>
+  </.form>
+</div>

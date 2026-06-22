@@ -86,6 +86,40 @@
       iframe={@iframe}
     />
   <% end %>
+  <!-- WORD CLOUD -->
+  <%= if @current_word_cloud do %>
+    <div
+      id="word-cloud-presenter"
+      class="h-full w-full flex flex-col justify-center bg-black/90 absolute z-30 left-1/2 top-1/2 transform -translate-y-1/2 -translate-x-1/2 p-10"
+    >
+      <div class="w-full md:w-2/3 mx-auto">
+        <p class={"#{if @iframe, do: "text-xl mb-6", else: "text-4xl mb-12"} text-white font-bold text-center"}>
+          {@current_word_cloud.title}
+        </p>
+        <%= if length(@word_cloud_frequencies) > 0 do %>
+          <div class="flex flex-wrap gap-4 justify-center items-center">
+            <%= for {{word, count}, index} <- Enum.with_index(@word_cloud_frequencies) do %>
+              <% max_count = elem(hd(@word_cloud_frequencies), 1) %>
+              <% ratio = if max_count > 0, do: count / max_count, else: 0 %>
+              <span class={
+                cond do
+                  ratio >= 0.8 -> "#{if @iframe, do: "text-3xl", else: "text-6xl"} font-black"
+                  ratio >= 0.6 -> "#{if @iframe, do: "text-2xl", else: "text-5xl"} font-bold"
+                  ratio >= 0.4 -> "#{if @iframe, do: "text-xl", else: "text-4xl"} font-semibold"
+                  ratio >= 0.2 -> "#{if @iframe, do: "text-lg", else: "text-3xl"} font-medium"
+                  true -> "#{if @iframe, do: "text-base", else: "text-2xl"} font-normal"
+                end
+              } style={"color: hsl(#{rem(index * 47, 360)}, 70%, 65%)"}>
+                {word}
+              </span>
+            <% end %>
+          </div>
+        <% else %>
+          <p class="text-gray-500 text-center text-2xl italic">{gettext("Waiting for responses...")}</p>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
   <!-- MESSAGES -->
   <div
     id="slider-wrapper"

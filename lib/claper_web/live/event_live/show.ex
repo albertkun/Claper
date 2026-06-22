@@ -2,7 +2,7 @@ defmodule ClaperWeb.EventLive.Show do
   alias Claper.Interactions
   use ClaperWeb, :live_view
 
-  alias Claper.{Posts, Polls, Forms, Quizzes, Stats}
+  alias Claper.{Posts, Polls, Forms, Quizzes, Stats, WordClouds}
   alias ClaperWeb.Presence
 
   on_mount(ClaperWeb.AttendeeLiveAuth)
@@ -342,6 +342,16 @@ defmodule ClaperWeb.EventLive.Show do
     {:noreply,
      socket
      |> update(:current_interaction, fn _current_interaction -> nil end)}
+  end
+
+  @impl true
+  def handle_info({:word_cloud_updated, %WordClouds.WordCloud{enabled: true} = word_cloud}, socket) do
+    {:noreply, socket |> load_current_interaction(word_cloud, true)}
+  end
+
+  @impl true
+  def handle_info({:word_cloud_deleted, %WordClouds.WordCloud{enabled: true}}, socket) do
+    {:noreply, socket |> update(:current_interaction, fn _current_interaction -> nil end)}
   end
 
   @impl true
@@ -909,6 +919,10 @@ defmodule ClaperWeb.EventLive.Show do
         |> assign(:selected_quiz_question_opts, [])
       end
     end
+  end
+
+  defp load_current_interaction(socket, %WordClouds.WordCloud{} = interaction, _same_interaction) do
+    socket |> assign(:current_interaction, interaction)
   end
 
   defp load_current_interaction(socket, interaction, _same_interaction) do
