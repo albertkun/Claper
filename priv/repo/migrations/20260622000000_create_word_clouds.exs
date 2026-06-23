@@ -6,6 +6,7 @@ defmodule Claper.Repo.Migrations.CreateWordClouds do
       add :title, :string, null: false
       add :position, :integer, null: false
       add :enabled, :boolean, default: false, null: false
+
       add :presentation_file_id, references(:presentation_files, on_delete: :delete_all),
         null: false
 

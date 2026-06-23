@@ -42,7 +42,9 @@ defmodule ClaperWeb.EventLive.WordCloudComponent do
           <div class="mb-2 flex flex-wrap gap-1">
             <span class="text-gray-400 text-xs">{gettext("Your words:")}</span>
             <%= for entry <- @existing_entries do %>
-              <span class="bg-gray-700 text-white text-xs rounded-full px-2 py-0.5">{entry.word}</span>
+              <span class="bg-gray-700 text-white text-xs rounded-full px-2 py-0.5">
+                {entry.word}
+              </span>
             <% end %>
           </div>
         <% end %>

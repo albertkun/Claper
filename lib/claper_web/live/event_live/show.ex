@@ -345,7 +345,10 @@ defmodule ClaperWeb.EventLive.Show do
   end
 
   @impl true
-  def handle_info({:word_cloud_updated, %WordClouds.WordCloud{enabled: true} = word_cloud}, socket) do
+  def handle_info(
+        {:word_cloud_updated, %WordClouds.WordCloud{enabled: true} = word_cloud},
+        socket
+      ) do
     {:noreply, socket |> load_current_interaction(word_cloud, true)}
   end
 
