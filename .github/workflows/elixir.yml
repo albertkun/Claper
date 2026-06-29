@@ -55,6 +55,6 @@ jobs:
     - name: Check Formatting
       run: mix format --check-formatted
     - name: Check Credo Warnings
-      run: mix credo diff --from-git-merge-base origin/main
+      run: mix credo diff --from-git-merge-base origin/${{ github.base_ref || github.ref_name }}
     - name: Run tests
       run: mix test
