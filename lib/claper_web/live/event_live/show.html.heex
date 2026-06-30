@@ -92,90 +92,90 @@
             id="poll-wrapper-parent"
             class="animate__animated animate__zoomInDown w-full lg:w-1/3 lg:mx-auto fixed top-16 z-10 px-2 lg:px-7 pb-6 max-h-screen overflow-y-auto"
           >
-          <div class="transition-all" id="poll-wrapper">
-            <.live_component
-              module={ClaperWeb.EventLive.PollComponent}
-              id={"#{@current_interaction.id}-poll"}
-              poll={@current_interaction}
-              current_user={@current_user}
-              attendee_identifier={@attendee_identifier}
-              event={@event}
-              selected_poll_opt={@selected_poll_opt}
-              current_poll_vote={@current_poll_vote}
-              show_results={@current_interaction.show_results}
-            />
+            <div class="transition-all" id="poll-wrapper">
+              <.live_component
+                module={ClaperWeb.EventLive.PollComponent}
+                id={"#{@current_interaction.id}-poll"}
+                poll={@current_interaction}
+                current_user={@current_user}
+                attendee_identifier={@attendee_identifier}
+                event={@event}
+                selected_poll_opt={@selected_poll_opt}
+                current_poll_vote={@current_poll_vote}
+                show_results={@current_interaction.show_results}
+              />
+            </div>
           </div>
-        </div>
-      <% %Claper.Forms.Form{} -> %>
-        <div
-          id="form-wrapper-parent"
-          class="animate__animated animate__zoomInDown w-full lg:w-1/3 lg:mx-auto fixed top-16 z-10 px-2 pb-6 lg:px-7 max-h-screen overflow-y-auto"
-        >
-          <div class="transition-all" id="form-wrapper">
-            <.live_component
-              module={ClaperWeb.EventLive.FormComponent}
-              id={"#{@current_interaction.id}-form"}
-              form={@current_interaction}
-              current_user={@current_user}
-              attendee_identifier={@attendee_identifier}
-              event={@event}
-              current_form_submit={@current_form_submit}
-            />
+        <% %Claper.Forms.Form{} -> %>
+          <div
+            id="form-wrapper-parent"
+            class="animate__animated animate__zoomInDown w-full lg:w-1/3 lg:mx-auto fixed top-16 z-10 px-2 pb-6 lg:px-7 max-h-screen overflow-y-auto"
+          >
+            <div class="transition-all" id="form-wrapper">
+              <.live_component
+                module={ClaperWeb.EventLive.FormComponent}
+                id={"#{@current_interaction.id}-form"}
+                form={@current_interaction}
+                current_user={@current_user}
+                attendee_identifier={@attendee_identifier}
+                event={@event}
+                current_form_submit={@current_form_submit}
+              />
+            </div>
           </div>
-        </div>
-      <% %Claper.Embeds.Embed{} -> %>
-        <div
-          :if={@current_interaction.attendee_visibility == true}
-          id="embed-wrapper-parent"
-          class="animate__animated animate__zoomInDown w-full lg:w-1/3 lg:mx-auto fixed top-16 z-10 px-2 pb-6 lg:px-7 max-h-screen overflow-y-auto"
-        >
-          <div class="transition-all" id="embed-wrapper">
-            <.live_component
-              module={ClaperWeb.EventLive.EmbedComponent}
-              id={"#{@current_interaction.id}-embed"}
-              embed={@current_interaction}
-              current_user={@current_user}
-              attendee_identifier={@attendee_identifier}
-              event={@event}
-            />
+        <% %Claper.Embeds.Embed{} -> %>
+          <div
+            :if={@current_interaction.attendee_visibility == true}
+            id="embed-wrapper-parent"
+            class="animate__animated animate__zoomInDown w-full lg:w-1/3 lg:mx-auto fixed top-16 z-10 px-2 pb-6 lg:px-7 max-h-screen overflow-y-auto"
+          >
+            <div class="transition-all" id="embed-wrapper">
+              <.live_component
+                module={ClaperWeb.EventLive.EmbedComponent}
+                id={"#{@current_interaction.id}-embed"}
+                embed={@current_interaction}
+                current_user={@current_user}
+                attendee_identifier={@attendee_identifier}
+                event={@event}
+              />
+            </div>
           </div>
-        </div>
-      <% %Claper.Quizzes.Quiz{} -> %>
-        <div
-          id="quiz-wrapper-parent"
-          class="animate__animated animate__zoomInDown w-full lg:w-1/3 lg:mx-auto fixed top-16 z-10 px-2 pb-6 lg:px-7 max-h-screen overflow-y-auto"
-        >
-          <div class="transition-all" id="quiz-wrapper">
-            <.live_component
-              module={ClaperWeb.EventLive.QuizComponent}
-              id={"#{@current_interaction.id}-quiz"}
-              quiz={@current_interaction}
-              current_user={@current_user}
-              attendee_identifier={@attendee_identifier}
-              event={@event}
-              selected_quiz_question_opts={@selected_quiz_question_opts}
-              current_quiz_question_idx={@current_quiz_question_idx}
-              current_quiz_responses={@current_quiz_responses}
-              quiz_score={@quiz_score}
-            />
+        <% %Claper.Quizzes.Quiz{} -> %>
+          <div
+            id="quiz-wrapper-parent"
+            class="animate__animated animate__zoomInDown w-full lg:w-1/3 lg:mx-auto fixed top-16 z-10 px-2 pb-6 lg:px-7 max-h-screen overflow-y-auto"
+          >
+            <div class="transition-all" id="quiz-wrapper">
+              <.live_component
+                module={ClaperWeb.EventLive.QuizComponent}
+                id={"#{@current_interaction.id}-quiz"}
+                quiz={@current_interaction}
+                current_user={@current_user}
+                attendee_identifier={@attendee_identifier}
+                event={@event}
+                selected_quiz_question_opts={@selected_quiz_question_opts}
+                current_quiz_question_idx={@current_quiz_question_idx}
+                current_quiz_responses={@current_quiz_responses}
+                quiz_score={@quiz_score}
+              />
+            </div>
           </div>
-        </div>
-      <% %Claper.WordClouds.WordCloud{} -> %>
-        <div
-          id="word-cloud-wrapper-parent"
-          class="animate__animated animate__zoomInDown w-full lg:w-1/3 lg:mx-auto fixed top-16 z-10 px-2 pb-6 lg:px-7 max-h-screen overflow-y-auto"
-        >
-          <div class="transition-all" id="word-cloud-wrapper">
-            <.live_component
-              module={ClaperWeb.EventLive.WordCloudComponent}
-              id={"#{@current_interaction.id}-word-cloud"}
-              word_cloud={@current_interaction}
-              current_user={@current_user}
-              attendee_identifier={@attendee_identifier}
-              event={@event}
-            />
+        <% %Claper.WordClouds.WordCloud{} -> %>
+          <div
+            id="word-cloud-wrapper-parent"
+            class="animate__animated animate__zoomInDown w-full lg:w-1/3 lg:mx-auto fixed top-16 z-10 px-2 pb-6 lg:px-7 max-h-screen overflow-y-auto"
+          >
+            <div class="transition-all" id="word-cloud-wrapper">
+              <.live_component
+                module={ClaperWeb.EventLive.WordCloudComponent}
+                id={"#{@current_interaction.id}-word-cloud"}
+                word_cloud={@current_interaction}
+                current_user={@current_user}
+                attendee_identifier={@attendee_identifier}
+                event={@event}
+              />
+            </div>
           </div>
-        </div>
         <% _ -> %>
           <!-- Handle any other types of interactions here if needed -->
       <% end %>
