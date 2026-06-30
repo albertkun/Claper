@@ -2,14 +2,26 @@ defmodule ClaperWeb.EventLive.PollComponent do
   use ClaperWeb, :live_component
 
   @impl true
+  def update(assigns, socket) do
+    {:ok,
+     socket
+     |> assign(assigns)
+     |> assign_new(:survey, fn -> false end)}
+  end
+
+  @impl true
   def render(assigns) do
     ~H"""
     <div>
       <div
-        id="collapsed-poll"
+        id={"collapsed-poll-#{@poll.id}"}
         class="bg-gray-900 py-3 px-6 text-black shadow-lg mx-auto rounded-full w-max hidden"
       >
-        <div class="block w-full h-full cursor-pointer" phx-click={toggle_poll()} phx-target={@myself}>
+        <div
+          class="block w-full h-full cursor-pointer"
+          phx-click={toggle_poll(@poll.id)}
+          phx-target={@myself}
+        >
           <div class="text-white flex space-x-2 items-center">
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -29,8 +41,15 @@ defmodule ClaperWeb.EventLive.PollComponent do
           </div>
         </div>
       </div>
-      <div id="extended-poll" class="bg-gray-900 w-full py-3 px-6 text-black shadow-lg rounded-md">
-        <div class="block w-full h-full cursor-pointer" phx-click={toggle_poll()} phx-target={@myself}>
+      <div
+        id={"extended-poll-#{@poll.id}"}
+        class="bg-gray-900 w-full py-3 px-6 text-black shadow-lg rounded-md"
+      >
+        <div
+          class="block w-full h-full cursor-pointer"
+          phx-click={toggle_poll(@poll.id)}
+          phx-target={@myself}
+        >
           <div id="poll-pane" class="float-right mt-2">
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -86,9 +105,10 @@ defmodule ClaperWeb.EventLive.PollComponent do
                   </button>
                 <% else %>
                   <button
-                    id={"poll-opt-#{idx}"}
-                    phx-click="select-poll-opt"
+                    id={"poll-opt-#{@poll.id}-#{idx}"}
+                    phx-click={if @survey, do: "survey-select-poll-opt", else: "select-poll-opt"}
                     phx-value-opt={idx}
+                    phx-value-poll-id={@poll.id}
                     class="bg-gray-500 px-3 py-2 flex justify-between items-center rounded-lg relative text-white"
                   >
                     <div
@@ -128,7 +148,8 @@ defmodule ClaperWeb.EventLive.PollComponent do
             </button>
           <% else %>
             <button
-              phx-click="vote"
+              phx-click={if @survey, do: "survey-vote", else: "vote"}
+              phx-value-poll-id={@poll.id}
               phx-disable-with="..."
               class="px-3 py-2 text-white font-medium bg-primary-400 hover:bg-primary-500 rounded-md mt-3 mb-4"
             >
@@ -141,18 +162,18 @@ defmodule ClaperWeb.EventLive.PollComponent do
     """
   end
 
-  def toggle_poll(js \\ %JS{}) do
+  def toggle_poll(poll_id, js \\ %JS{}) do
     js
     |> JS.toggle(
       out: "animate__animated animate__zoomOut",
       in: "animate__animated animate__zoomIn",
-      to: "#collapsed-poll",
+      to: "#collapsed-poll-#{poll_id}",
       time: 50
     )
     |> JS.toggle(
       out: "animate__animated animate__zoomOut",
       in: "animate__animated animate__zoomIn",
-      to: "#extended-poll"
+      to: "#extended-poll-#{poll_id}"
     )
   end
 end

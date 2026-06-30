@@ -57,11 +57,13 @@ defmodule ClaperWeb.EventLive.Presenter do
         |> assign(:pinned_posts, list_pinned_posts(socket, event.uuid))
         |> assign(:show_only_pinned, event.presentation_file.presentation_state.show_only_pinned)
         |> assign(:reacts, [])
+        |> assign(:current_polls, [])
         |> poll_at_position
         |> form_at_position
         |> embed_at_position
         |> quiz_at_position
         |> word_cloud_at_position
+        |> survey_polls_at_position
 
       {:ok, socket, temporary_assigns: []}
     end
@@ -117,7 +119,26 @@ defmodule ClaperWeb.EventLive.Presenter do
      |> push_event("reset-global-react", %{})
      |> poll_at_position
      |> embed_at_position
-     |> word_cloud_at_position}
+     |> word_cloud_at_position
+     |> survey_polls_at_position}
+  end
+
+  @impl true
+  def handle_info({:current_interactions, interactions}, socket) do
+    polls =
+      interactions
+      |> Enum.filter(&match?(%Poll{}, &1))
+      |> Enum.map(&Claper.Polls.set_percentages/1)
+
+    {:noreply,
+     socket
+     |> assign(:current_polls, polls)
+     |> assign(:current_poll, nil)
+     |> assign(:current_embed, nil)
+     |> assign(:current_form, nil)
+     |> assign(:current_quiz, nil)
+     |> assign(:current_word_cloud, nil)
+     |> assign(:word_cloud_frequencies, [])}
   end
 
   @impl true
@@ -142,6 +163,8 @@ defmodule ClaperWeb.EventLive.Presenter do
 
   @impl true
   def handle_info({:poll_updated, poll}, socket) do
+    socket = update_survey_poll(socket, poll)
+
     if poll.enabled do
       {:noreply,
        socket
@@ -490,6 +513,42 @@ defmodule ClaperWeb.EventLive.Presenter do
     socket
     |> assign(:current_word_cloud, word_cloud)
     |> assign(:word_cloud_frequencies, word_frequencies)
+  end
+
+  # In survey mode, gather every enabled poll at the current position so the
+  # projected view can display them side by side.
+  defp survey_polls_at_position(%{assigns: %{event: event, state: state}} = socket) do
+    if state.survey_mode do
+      polls =
+        event
+        |> Claper.Interactions.get_active_interactions(state.position)
+        |> Enum.filter(&match?(%Poll{}, &1))
+        |> Enum.map(&Claper.Polls.set_percentages/1)
+
+      assign(socket, :current_polls, polls)
+    else
+      assign(socket, :current_polls, [])
+    end
+  end
+
+  # Replaces a single poll inside the survey list with its updated counterpart.
+  defp update_survey_poll(socket, poll) do
+    polls = socket.assigns[:current_polls] || []
+
+    cond do
+      not Enum.any?(polls, &(&1.id == poll.id)) ->
+        socket
+
+      poll.enabled ->
+        assign(
+          socket,
+          :current_polls,
+          Enum.map(polls, fn p -> if p.id == poll.id, do: poll, else: p end)
+        )
+
+      true ->
+        assign(socket, :current_polls, Enum.reject(polls, &(&1.id == poll.id)))
+    end
   end
 
   defp list_posts(_socket, event_id) do

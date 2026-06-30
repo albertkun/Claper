@@ -425,6 +425,27 @@ defmodule ClaperWeb.EventLive.ManagerSettingsComponent do
                 <div :if={!@show_shortcut}></div>
               </ClaperWeb.Component.Input.check_button>
             </div>
+            <div>
+              <ClaperWeb.Component.Input.check_button key={:survey_mode} checked={@state.survey_mode}>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  class="w-5 h-5"
+                >
+                  <path d="M3 5h2v2H3V5zm4 0h14v2H7V5zM3 11h2v2H3v-2zm4 0h14v2H7v-2zM3 17h2v2H3v-2zm4 0h14v2H7v-2z" />
+                </svg>
+                <div>
+                  <span :if={!@state.survey_mode}>
+                    {gettext("Enable survey mode (multiple questions at once)")}
+                  </span>
+                  <span :if={@state.survey_mode}>
+                    {gettext("Disable survey mode")}
+                  </span>
+                </div>
+                <div :if={!@show_shortcut}></div>
+              </ClaperWeb.Component.Input.check_button>
+            </div>
           </div>
 
           <div class="grid grid-cols-1 space-y-1.5">

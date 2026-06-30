@@ -347,127 +347,43 @@ defmodule ClaperWeb.EventLive.Manage do
 
   def handle_event("poll-set-active", %{"id" => id}, socket) do
     case Polls.get_poll_for_event(id, event_id(socket)) do
-      nil ->
-        {:noreply, socket}
-
-      poll ->
-        with :ok <- Claper.Interactions.enable_interaction(poll) do
-          Phoenix.PubSub.broadcast(
-            Claper.PubSub,
-            "event:#{socket.assigns.event.uuid}",
-            {:current_interaction, poll}
-          )
-
-          {:noreply,
-           socket
-           |> assign(:current_interaction, poll)
-           |> interactions_at_position(socket.assigns.state.position)}
-        end
+      nil -> {:noreply, socket}
+      poll -> {:noreply, activate_interaction(socket, poll)}
     end
   end
 
   def handle_event("form-set-active", %{"id" => id}, socket) do
     case Forms.get_form_for_event(id, event_id(socket)) do
-      nil ->
-        {:noreply, socket}
-
-      form ->
-        with :ok <- Claper.Interactions.enable_interaction(form) do
-          Phoenix.PubSub.broadcast(
-            Claper.PubSub,
-            "event:#{socket.assigns.event.uuid}",
-            {:current_interaction, form}
-          )
-
-          {:noreply,
-           socket
-           |> assign(:current_interaction, form)
-           |> interactions_at_position(socket.assigns.state.position)}
-        end
+      nil -> {:noreply, socket}
+      form -> {:noreply, activate_interaction(socket, form)}
     end
   end
 
   def handle_event("embed-set-active", %{"id" => id}, socket) do
     case Embeds.get_embed_for_event(id, event_id(socket)) do
-      nil ->
-        {:noreply, socket}
-
-      embed ->
-        with :ok <- Claper.Interactions.enable_interaction(embed) do
-          Phoenix.PubSub.broadcast(
-            Claper.PubSub,
-            "event:#{socket.assigns.event.uuid}",
-            {:current_interaction, embed}
-          )
-
-          {:noreply,
-           socket
-           |> assign(:current_interaction, embed)
-           |> interactions_at_position(socket.assigns.state.position)}
-        end
+      nil -> {:noreply, socket}
+      embed -> {:noreply, activate_interaction(socket, embed)}
     end
   end
 
   def handle_event("poll-set-inactive", %{"id" => id}, socket) do
     case Polls.get_poll_for_event(id, event_id(socket)) do
-      nil ->
-        {:noreply, socket}
-
-      poll ->
-        with {:ok, _} <- Claper.Interactions.disable_interaction(poll) do
-          Phoenix.PubSub.broadcast(
-            Claper.PubSub,
-            "event:#{socket.assigns.event.uuid}",
-            {:current_interaction, nil}
-          )
-        end
-
-        {:noreply,
-         socket
-         |> assign(:current_interaction, nil)
-         |> interactions_at_position(socket.assigns.state.position)}
+      nil -> {:noreply, socket}
+      poll -> {:noreply, deactivate_interaction(socket, poll)}
     end
   end
 
   def handle_event("form-set-inactive", %{"id" => id}, socket) do
     case Forms.get_form_for_event(id, event_id(socket)) do
-      nil ->
-        {:noreply, socket}
-
-      form ->
-        with {:ok, _} <- Claper.Interactions.disable_interaction(form) do
-          Phoenix.PubSub.broadcast(
-            Claper.PubSub,
-            "event:#{socket.assigns.event.uuid}",
-            {:current_interaction, nil}
-          )
-        end
-
-        {:noreply,
-         socket
-         |> assign(:current_interaction, nil)
-         |> interactions_at_position(socket.assigns.state.position)}
+      nil -> {:noreply, socket}
+      form -> {:noreply, deactivate_interaction(socket, form)}
     end
   end
 
   def handle_event("embed-set-inactive", %{"id" => id}, socket) do
     case Embeds.get_embed_for_event(id, event_id(socket)) do
-      nil ->
-        {:noreply, socket}
-
-      embed ->
-        with {:ok, _} <- Claper.Interactions.disable_interaction(embed) do
-          Phoenix.PubSub.broadcast(
-            Claper.PubSub,
-            "event:#{socket.assigns.event.uuid}",
-            {:current_interaction, nil}
-          )
-        end
-
-        {:noreply,
-         socket
-         |> assign(:current_interaction, nil)
-         |> interactions_at_position(socket.assigns.state.position)}
+      nil -> {:noreply, socket}
+      embed -> {:noreply, deactivate_interaction(socket, embed)}
     end
   end
 
@@ -477,85 +393,76 @@ defmodule ClaperWeb.EventLive.Manage do
            :quiz_questions,
            quiz_questions: :quiz_question_opts
          ]) do
-      nil ->
-        {:noreply, socket}
-
-      quiz ->
-        with :ok <- Claper.Interactions.enable_interaction(quiz) do
-          Phoenix.PubSub.broadcast(
-            Claper.PubSub,
-            "event:#{socket.assigns.event.uuid}",
-            {:current_interaction, quiz}
-          )
-
-          {:noreply,
-           socket
-           |> assign(:current_interaction, quiz)
-           |> interactions_at_position(socket.assigns.state.position)}
-        end
+      nil -> {:noreply, socket}
+      quiz -> {:noreply, activate_interaction(socket, quiz)}
     end
   end
 
   def handle_event("quiz-set-inactive", %{"id" => id}, socket) do
     case Quizzes.get_quiz_for_event(id, event_id(socket)) do
-      nil ->
-        {:noreply, socket}
-
-      quiz ->
-        with {:ok, _} <- Claper.Interactions.disable_interaction(quiz) do
-          Phoenix.PubSub.broadcast(
-            Claper.PubSub,
-            "event:#{socket.assigns.event.uuid}",
-            {:current_interaction, nil}
-          )
-        end
-
-        {:noreply,
-         socket
-         |> assign(:current_interaction, nil)
-         |> interactions_at_position(socket.assigns.state.position)}
+      nil -> {:noreply, socket}
+      quiz -> {:noreply, deactivate_interaction(socket, quiz)}
     end
   end
 
   def handle_event("word-cloud-set-active", %{"id" => id}, socket) do
     case WordClouds.get_word_cloud_for_event(id, event_id(socket)) do
-      nil ->
-        {:noreply, socket}
-
-      word_cloud ->
-        with :ok <- Claper.Interactions.enable_interaction(word_cloud) do
-          Phoenix.PubSub.broadcast(
-            Claper.PubSub,
-            "event:#{socket.assigns.event.uuid}",
-            {:current_interaction, word_cloud}
-          )
-
-          {:noreply,
-           socket
-           |> assign(:current_interaction, word_cloud)
-           |> interactions_at_position(socket.assigns.state.position)}
-        end
+      nil -> {:noreply, socket}
+      word_cloud -> {:noreply, activate_interaction(socket, word_cloud)}
     end
   end
 
   def handle_event("word-cloud-set-inactive", %{"id" => id}, socket) do
     case WordClouds.get_word_cloud_for_event(id, event_id(socket)) do
-      nil ->
-        {:noreply, socket}
+      nil -> {:noreply, socket}
+      word_cloud -> {:noreply, deactivate_interaction(socket, word_cloud)}
+    end
+  end
 
-      word_cloud ->
-        with {:ok, _} <- Claper.Interactions.disable_interaction(word_cloud) do
-          Phoenix.PubSub.broadcast(
-            Claper.PubSub,
-            "event:#{socket.assigns.event.uuid}",
-            {:current_interaction, nil}
-          )
-        end
+  # Enables an interaction and notifies attendee/presenter views. In survey mode
+  # several interactions can be active at once, so we broadcast the full active
+  # list; otherwise we keep the legacy single-active behavior.
+  defp activate_interaction(socket, interaction) do
+    state = socket.assigns.state
 
-        {:noreply,
-         socket
-         |> assign(:current_interaction, nil)
-         |> interactions_at_position(socket.assigns.state.position)}
+    with :ok <- Claper.Interactions.enable_interaction(interaction, state.survey_mode) do
+      broadcast_interaction_change(socket, interaction)
+    end
+
+    socket
+    |> assign(:current_interaction, interaction)
+    |> interactions_at_position(state.position)
+  end
+
+  defp deactivate_interaction(socket, interaction) do
+    state = socket.assigns.state
+
+    with {:ok, _} <- Claper.Interactions.disable_interaction(interaction) do
+      broadcast_interaction_change(socket, nil)
+    end
+
+    socket
+    |> assign(:current_interaction, nil)
+    |> interactions_at_position(state.position)
+  end
+
+  defp broadcast_interaction_change(socket, interaction) do
+    %{event: event, state: state} = socket.assigns
+
+    if state.survey_mode do
+      actives = Claper.Interactions.get_active_interactions(event, state.position)
+
+      Phoenix.PubSub.broadcast(
+        Claper.PubSub,
+        "event:#{event.uuid}",
+        {:current_interactions, actives}
+      )
+    else
+      Phoenix.PubSub.broadcast(
+        Claper.PubSub,
+        "event:#{event.uuid}",
+        {:current_interaction, interaction}
+      )
     end
   end
 
@@ -716,6 +623,29 @@ defmodule ClaperWeb.EventLive.Manage do
           :show_attendee_count => value
         }
       )
+
+    {:noreply, socket |> assign(:state, new_state)}
+  end
+
+  @impl true
+  def handle_event(
+        "checked",
+        %{"key" => "survey_mode", "value" => value},
+        %{assigns: %{event: event, state: state}} = socket
+      ) do
+    {:ok, new_state} =
+      Claper.Presentations.update_presentation_state(
+        state,
+        %{
+          :survey_mode => value
+        }
+      )
+
+    Phoenix.PubSub.broadcast(
+      Claper.PubSub,
+      "event:#{event.uuid}",
+      {:state_updated, new_state}
+    )
 
     {:noreply, socket |> assign(:state, new_state)}
   end

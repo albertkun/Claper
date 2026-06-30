@@ -94,6 +94,9 @@ defmodule ClaperWeb.EventLive.Show do
       |> assign(:love_posts, reacted_posts(socket, event.id, "❤️"))
       |> assign(:lol_posts, reacted_posts(socket, event.id, "😂"))
       |> assign(:selected_poll_opt, [])
+      |> assign(:selected_poll_opts, %{})
+      |> assign(:current_poll_votes, %{})
+      |> assign(:current_interactions, [])
       |> assign(:selected_quiz_question_opts, [])
       |> assign(:current_quiz_question_idx, 0)
       |> assign(:event, event)
@@ -103,6 +106,7 @@ defmodule ClaperWeb.EventLive.Show do
       |> assign(:post_count, Enum.count(posts))
       |> starting_soon_assigns(event)
       |> get_current_interaction(event, event.presentation_file.presentation_state.position)
+      |> refresh_survey_interactions(event.presentation_file.presentation_state.position)
       |> check_leader(event)
       |> leader_list(event)
 
@@ -196,6 +200,7 @@ defmodule ClaperWeb.EventLive.Show do
     {:noreply,
      socket
      |> assign(:state, presentation_state)
+     |> refresh_survey_interactions(presentation_state.position)
      |> stream(:posts, list_posts(socket, socket.assigns.event.uuid), reset: true)}
   end
 
@@ -244,6 +249,7 @@ defmodule ClaperWeb.EventLive.Show do
      socket
      |> assign(:current_page, page)
      |> get_current_interaction(socket.assigns.event, page)
+     |> refresh_survey_interactions(page)
      |> push_event("reset-global-react", %{})}
   end
 
@@ -253,6 +259,11 @@ defmodule ClaperWeb.EventLive.Show do
         socket
       ) do
     {:noreply, socket |> load_current_interaction(interaction, false)}
+  end
+
+  @impl true
+  def handle_info({:current_interactions, interactions}, socket) do
+    {:noreply, socket |> load_survey_interactions(interactions)}
   end
 
   @impl true
@@ -292,7 +303,8 @@ defmodule ClaperWeb.EventLive.Show do
   def handle_info({:poll_updated, %Claper.Polls.Poll{enabled: true} = poll}, socket) do
     {:noreply,
      socket
-     |> load_current_interaction(poll, true)}
+     |> load_current_interaction(poll, true)
+     |> update_survey_poll(poll)}
   end
 
   @impl true
@@ -655,6 +667,52 @@ defmodule ClaperWeb.EventLive.Show do
     end
   end
 
+  # --- Survey mode (multiple simultaneous polls) ---
+  @impl true
+  def handle_event("survey-select-poll-opt", %{"opt" => opt, "poll-id" => pid}, socket) do
+    poll_id = String.to_integer(pid)
+    poll = Enum.find(socket.assigns.current_interactions, &(&1.id == poll_id))
+    selected = Map.get(socket.assigns.selected_poll_opts, poll_id, [])
+
+    new_selected =
+      cond do
+        poll && poll.multiple && Enum.member?(selected, opt) ->
+          Enum.filter(selected, &(&1 != opt))
+
+        poll && poll.multiple ->
+          [opt | selected]
+
+        true ->
+          [opt]
+      end
+
+    {:noreply,
+     socket
+     |> assign(
+       :selected_poll_opts,
+       Map.put(socket.assigns.selected_poll_opts, poll_id, new_selected)
+     )}
+  end
+
+  @impl true
+  def handle_event(
+        "survey-vote",
+        %{"poll-id" => pid},
+        %{assigns: %{current_user: current_user}} = socket
+      )
+      when is_map(current_user) do
+    {:noreply, survey_vote(socket, String.to_integer(pid), current_user.id)}
+  end
+
+  @impl true
+  def handle_event(
+        "survey-vote",
+        %{"poll-id" => pid},
+        %{assigns: %{attendee_identifier: attendee_identifier}} = socket
+      ) do
+    {:noreply, survey_vote(socket, String.to_integer(pid), attendee_identifier)}
+  end
+
   @impl true
   def handle_event(
         "next-question",
@@ -938,6 +996,93 @@ defmodule ClaperWeb.EventLive.Show do
 
   defp maybe_reset_selected_poll_opt(socket, _same_interaction) do
     socket |> assign(:selected_poll_opt, [])
+  end
+
+  # --- Survey mode helpers ---
+
+  # Re-loads every active interaction at the given position when survey mode is
+  # on; clears the list otherwise.
+  defp refresh_survey_interactions(socket, position) do
+    if socket.assigns.state.survey_mode do
+      interactions = Interactions.get_active_interactions(socket.assigns.event, position)
+      load_survey_interactions(socket, interactions)
+    else
+      socket |> assign(:current_interactions, [])
+    end
+  end
+
+  defp load_survey_interactions(socket, interactions) do
+    enriched =
+      Enum.map(interactions, fn
+        %Polls.Poll{} = poll ->
+          poll = Polls.set_percentages(poll)
+          %{poll | poll_opts: Enum.sort_by(poll.poll_opts, & &1.id, :asc)}
+
+        other ->
+          other
+      end)
+
+    votes =
+      enriched
+      |> Enum.filter(&match?(%Polls.Poll{}, &1))
+      |> Enum.into(%{}, fn poll -> {poll.id, survey_poll_vote(socket, poll.id)} end)
+
+    socket
+    |> assign(:current_interactions, enriched)
+    |> assign(:current_poll_votes, votes)
+  end
+
+  # Replaces a single poll inside the survey list (used for live result updates).
+  defp update_survey_poll(socket, poll) do
+    interactions = socket.assigns[:current_interactions] || []
+
+    if Enum.any?(interactions, &(&1.id == poll.id and match?(%Polls.Poll{}, &1))) do
+      updated =
+        Enum.map(interactions, fn
+          %Polls.Poll{id: id} when id == poll.id ->
+            %{poll | poll_opts: Enum.sort_by(poll.poll_opts, & &1.id, :asc)}
+
+          other ->
+            other
+        end)
+
+      socket |> assign(:current_interactions, updated)
+    else
+      socket
+    end
+  end
+
+  defp survey_vote(socket, poll_id, voter) do
+    poll = Enum.find(socket.assigns.current_interactions, &(&1.id == poll_id))
+
+    opts =
+      socket.assigns.selected_poll_opts
+      |> Map.get(poll_id, [])
+      |> Enum.map(fn opt -> Integer.parse(opt) |> elem(0) end)
+
+    poll_opts = Enum.map(opts, fn opt -> Enum.at(poll.poll_opts, opt) end)
+
+    case Claper.Polls.vote(voter, socket.assigns.event.uuid, poll_opts, poll_id) do
+      {:ok, voted_poll} ->
+        socket
+        |> assign(
+          :current_poll_votes,
+          Map.put(
+            socket.assigns.current_poll_votes,
+            voted_poll.id,
+            survey_poll_vote(socket, voted_poll.id)
+          )
+        )
+    end
+  end
+
+  defp survey_poll_vote(%{assigns: %{current_user: current_user}}, poll_id)
+       when is_map(current_user) do
+    Polls.get_poll_vote(current_user.id, poll_id)
+  end
+
+  defp survey_poll_vote(%{assigns: %{attendee_identifier: attendee_identifier}}, poll_id) do
+    Polls.get_poll_vote(attendee_identifier, poll_id)
   end
 
   defp update_stats(%{assigns: %{current_user: current_user}}, event) when is_map(current_user) do

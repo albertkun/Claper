@@ -52,6 +52,12 @@ defmodule Claper.Interactions do
     end
   end
 
+  def get_active_interactions(event, position) do
+    with {:ok, interactions} <- get_interactions_at_position(event, position) do
+      interactions |> Enum.filter(&(&1.enabled == true))
+    end
+  end
+
   def get_interactions_at_position(
         %Events.Event{
           presentation_file: %Presentations.PresentationFile{id: presentation_file_id}
@@ -82,7 +88,21 @@ defmodule Claper.Interactions do
     end
   end
 
-  def enable_interaction(interaction) do
+  @doc """
+  Enables an interaction. In survey mode the other interactions at the same
+  position are left untouched so several can be active simultaneously;
+  otherwise every sibling interaction is disabled first (one-at-a-time).
+  """
+  def enable_interaction(interaction, survey_mode \\ false)
+
+  def enable_interaction(interaction, true) do
+    case set_enabled(interaction) do
+      {:ok, _} -> :ok
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  def enable_interaction(interaction, false) do
     Ecto.Multi.new()
     |> Ecto.Multi.run(:disable_polls, fn _repo, _ ->
       {count, _} = Polls.disable_all(interaction.presentation_file_id, interaction.position)

@@ -623,6 +623,41 @@ Hooks.QRCode = {
   destroyed() {},
 };
 
+Hooks.QRCodeCorner = {
+  draw() {
+    var size = parseInt(this.el.dataset.size || "150", 10);
+    var url = this.el.dataset.code
+      ? window.location.protocol +
+        "//" +
+        window.location.host +
+        "/e/" +
+        this.el.dataset.code
+      : window.location.href;
+
+    if (this.qrCode == null) {
+      this.qrCode = new QRCodeStyling({
+        width: size,
+        height: size,
+        margin: 4,
+        data: url,
+        cornersSquareOptions: { type: "square" },
+        dotsOptions: { type: "square", color: "#000000" },
+        backgroundOptions: { color: "#ffffff" },
+      });
+      this.qrCode.append(this.el);
+    } else {
+      this.qrCode.update({ width: size, height: size, data: url });
+    }
+  },
+  mounted() {
+    this.draw();
+  },
+  updated() {
+    this.draw();
+  },
+  destroyed() {},
+};
+
 Hooks.Dropdown = {
   mounted() {
     this.el.addEventListener("click", (e) => {
