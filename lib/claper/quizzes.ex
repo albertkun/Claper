@@ -100,7 +100,9 @@ defmodule Claper.Quizzes do
     from(q in Quiz,
       where:
         q.position == ^position and q.presentation_file_id == ^presentation_file_id and
-          q.enabled == true
+          q.enabled == true,
+      order_by: [desc: q.id],
+      limit: 1
     )
     |> Repo.one()
     |> Repo.preload([:quiz_questions, quiz_questions: :quiz_question_opts])

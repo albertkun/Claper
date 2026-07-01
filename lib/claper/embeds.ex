@@ -89,7 +89,9 @@ defmodule Claper.Embeds do
     from(e in Embed,
       where:
         e.position == ^position and e.presentation_file_id == ^presentation_file_id and
-          e.enabled == true
+          e.enabled == true,
+      order_by: [desc: e.id],
+      limit: 1
     )
     |> Repo.one()
   end

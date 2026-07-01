@@ -113,7 +113,9 @@ defmodule Claper.Polls do
     from(p in Poll,
       where:
         p.position == ^position and p.presentation_file_id == ^presentation_file_id and
-          p.enabled == true
+          p.enabled == true,
+      order_by: [desc: p.id],
+      limit: 1
     )
     |> Repo.one()
     |> Repo.preload(

@@ -39,7 +39,9 @@ defmodule Claper.WordClouds do
     from(w in WordCloud,
       where:
         w.position == ^position and w.presentation_file_id == ^presentation_file_id and
-          w.enabled == true
+          w.enabled == true,
+      order_by: [desc: w.id],
+      limit: 1
     )
     |> Repo.one()
   end

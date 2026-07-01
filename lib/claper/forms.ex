@@ -91,7 +91,9 @@ defmodule Claper.Forms do
     from(f in Form,
       where:
         f.position == ^position and f.presentation_file_id == ^presentation_file_id and
-          f.enabled == true
+          f.enabled == true,
+      order_by: [desc: f.id],
+      limit: 1
     )
     |> Repo.one()
   end
