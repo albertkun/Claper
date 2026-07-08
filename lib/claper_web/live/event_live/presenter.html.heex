@@ -77,46 +77,92 @@
       </div>
     </div>
   <% end %>
-  <!-- SURVEY (multiple polls) -->
-  <%= if @state.survey_mode && @current_polls != [] do %>
+  <!-- SURVEY (multiple simultaneous interactions) -->
+  <%= if @state.survey_mode && @survey_interactions != [] do %>
     <div
       id="survey"
       class={"#{if @state.poll_visible, do: "opacity-100", else: "opacity-0"} h-full w-full flex flex-col justify-center bg-black/90 absolute z-30 left-1/2 top-1/2 transform -translate-y-1/2 -translate-x-1/2 p-10 transition-opacity overflow-y-auto"}
     >
       <div class="w-full md:w-3/4 mx-auto">
-        <div class={"grid #{if length(@current_polls) > 1, do: "md:grid-cols-2", else: "grid-cols-1"} gap-8"}>
-          <%= for poll <- @current_polls do %>
-            <div class="bg-black/40 rounded-2xl p-6">
-              <p class={"#{if @iframe, do: "text-lg mb-4", else: "text-3xl mb-8"} text-white font-bold text-center"}>
-                {poll.title}
-              </p>
-              <div class={"#{if @iframe, do: "space-y-3", else: "space-y-5"} flex flex-col"}>
-                <%= for opt <- poll.poll_opts do %>
-                  <div class={"#{if @iframe, do: "py-1", else: "py-3"} bg-gray-500 px-5 rounded-3xl flex justify-between items-center relative text-white"}>
-                    <div
-                      style={"width: #{opt.percentage}%;"}
-                      class="bg-linear-to-r from-primary-500 to-secondary-500 rounded-3xl h-full absolute left-0 transition-all"
-                    >
-                    </div>
-                    <div class="flex space-x-3 z-10 text-left">
-                      <span class={"#{if @iframe, do: "text-sm", else: "text-xl"} flex-1 font-bold pr-2"}>
-                        {opt.content}
-                      </span>
-                    </div>
-                    <span class={"#{if @iframe, do: "text-sm", else: "text-xl"} z-10 font-bold"}>
-                      {opt.percentage}% ({opt.vote_count})
-                    </span>
+        <div class={"grid #{if length(@survey_interactions) > 1, do: "md:grid-cols-2", else: "grid-cols-1"} gap-8"}>
+          <%= for interaction <- @survey_interactions do %>
+            <%= case interaction do %>
+              <% %Claper.Polls.Poll{} = poll -> %>
+                <div class="bg-black/40 rounded-2xl p-6">
+                  <p class={"#{if @iframe, do: "text-lg mb-4", else: "text-3xl mb-8"} text-white font-bold text-center"}>
+                    {poll.title}
+                  </p>
+                  <div class={"#{if @iframe, do: "space-y-3", else: "space-y-5"} flex flex-col"}>
+                    <%= for opt <- poll.poll_opts do %>
+                      <div class={"#{if @iframe, do: "py-1", else: "py-3"} bg-gray-500 px-5 rounded-3xl flex justify-between items-center relative text-white"}>
+                        <div
+                          style={"width: #{opt.percentage}%;"}
+                          class="bg-linear-to-r from-primary-500 to-secondary-500 rounded-3xl h-full absolute left-0 transition-all"
+                        >
+                        </div>
+                        <div class="flex space-x-3 z-10 text-left">
+                          <span class={"#{if @iframe, do: "text-sm", else: "text-xl"} flex-1 font-bold pr-2"}>
+                            {opt.content}
+                          </span>
+                        </div>
+                        <span class={"#{if @iframe, do: "text-sm", else: "text-xl"} z-10 font-bold"}>
+                          {opt.percentage}% ({opt.vote_count})
+                        </span>
+                      </div>
+                    <% end %>
                   </div>
-                <% end %>
-              </div>
-            </div>
+                </div>
+              <% %Claper.WordClouds.WordCloud{} = word_cloud -> %>
+                <% frequencies = Map.get(@survey_word_frequencies, word_cloud.id, []) %>
+                <div class="bg-black/40 rounded-2xl p-6">
+                  <p class={"#{if @iframe, do: "text-lg mb-4", else: "text-3xl mb-8"} text-white font-bold text-center"}>
+                    {word_cloud.title}
+                  </p>
+                  <%= if length(frequencies) > 0 do %>
+                    <div class="flex flex-wrap gap-3 justify-center items-center">
+                      <%= for {{word, count}, index} <- Enum.with_index(frequencies) do %>
+                        <% max_count = elem(hd(frequencies), 1) %>
+                        <% ratio = if max_count > 0, do: count / max_count, else: 0 %>
+                        <span
+                          class={
+                            cond do
+                              ratio >= 0.8 ->
+                                "#{if @iframe, do: "text-2xl", else: "text-5xl"} font-black"
+
+                              ratio >= 0.6 ->
+                                "#{if @iframe, do: "text-xl", else: "text-4xl"} font-bold"
+
+                              ratio >= 0.4 ->
+                                "#{if @iframe, do: "text-lg", else: "text-3xl"} font-semibold"
+
+                              ratio >= 0.2 ->
+                                "#{if @iframe, do: "text-base", else: "text-2xl"} font-medium"
+
+                              true ->
+                                "#{if @iframe, do: "text-sm", else: "text-xl"} font-normal"
+                            end
+                          }
+                          style={"color: hsl(#{rem(index * 47, 360)}, 70%, 65%)"}
+                        >
+                          {word}
+                        </span>
+                      <% end %>
+                    </div>
+                  <% else %>
+                    <p class="text-gray-500 text-center text-xl italic">
+                      {gettext("Waiting for responses...")}
+                    </p>
+                  <% end %>
+                </div>
+              <% _ -> %>
+            <% end %>
           <% end %>
         </div>
       </div>
     </div>
   <% end %>
   <!-- QUIZ -->
-  <%= if @current_quiz do %>
+  <%= if @current_quiz && !@state.survey_mode do %>
     <.live_component
       module={ClaperWeb.EventLive.ManageableQuizComponent}
       id={"#{@current_quiz.id}-quiz"}
@@ -125,7 +171,7 @@
     />
   <% end %>
   <!-- WORD CLOUD -->
-  <%= if @current_word_cloud do %>
+  <%= if @current_word_cloud && !@state.survey_mode do %>
     <div
       id="word-cloud-presenter"
       class="h-full w-full flex flex-col justify-center bg-black/90 absolute z-30 left-1/2 top-1/2 transform -translate-y-1/2 -translate-x-1/2 p-10"

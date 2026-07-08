@@ -80,6 +80,64 @@
                     show_results={interaction.show_results}
                   />
                 </div>
+              <% %Claper.WordClouds.WordCloud{} -> %>
+                <div id={"survey-word-cloud-wrapper-#{interaction.id}"}>
+                  <.live_component
+                    module={ClaperWeb.EventLive.WordCloudComponent}
+                    id={"#{interaction.id}-word-cloud"}
+                    word_cloud={interaction}
+                    current_user={@current_user}
+                    attendee_identifier={@attendee_identifier}
+                    event={@event}
+                  />
+                </div>
+              <% %Claper.Forms.Form{} -> %>
+                <div id={"survey-form-wrapper-#{interaction.id}"}>
+                  <.live_component
+                    module={ClaperWeb.EventLive.FormComponent}
+                    id={"#{interaction.id}-form"}
+                    form={interaction}
+                    current_user={@current_user}
+                    attendee_identifier={@attendee_identifier}
+                    event={@event}
+                    current_form_submit={Map.get(@current_form_submits, interaction.id)}
+                  />
+                </div>
+              <% %Claper.Embeds.Embed{} -> %>
+                <div
+                  :if={interaction.attendee_visibility == true}
+                  id={"survey-embed-wrapper-#{interaction.id}"}
+                >
+                  <.live_component
+                    module={ClaperWeb.EventLive.EmbedComponent}
+                    id={"#{interaction.id}-embed"}
+                    embed={interaction}
+                    current_user={@current_user}
+                    attendee_identifier={@attendee_identifier}
+                    event={@event}
+                  />
+                </div>
+              <% %Claper.Quizzes.Quiz{} -> %>
+                <div
+                  :if={
+                    match?(%Claper.Quizzes.Quiz{}, @current_interaction) and
+                      @current_interaction.id == interaction.id
+                  }
+                  id={"survey-quiz-wrapper-#{interaction.id}"}
+                >
+                  <.live_component
+                    module={ClaperWeb.EventLive.QuizComponent}
+                    id={"#{interaction.id}-quiz"}
+                    quiz={@current_interaction}
+                    current_user={@current_user}
+                    attendee_identifier={@attendee_identifier}
+                    event={@event}
+                    selected_quiz_question_opts={@selected_quiz_question_opts}
+                    current_quiz_question_idx={@current_quiz_question_idx}
+                    current_quiz_responses={@current_quiz_responses}
+                    quiz_score={@quiz_score}
+                  />
+                </div>
               <% _ -> %>
             <% end %>
           <% end %>

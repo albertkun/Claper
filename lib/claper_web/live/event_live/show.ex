@@ -96,6 +96,7 @@ defmodule ClaperWeb.EventLive.Show do
       |> assign(:selected_poll_opt, [])
       |> assign(:selected_poll_opts, %{})
       |> assign(:current_poll_votes, %{})
+      |> assign(:current_form_submits, %{})
       |> assign(:current_interactions, [])
       |> assign(:selected_quiz_question_opts, [])
       |> assign(:current_quiz_question_idx, 0)
@@ -197,10 +198,24 @@ defmodule ClaperWeb.EventLive.Show do
 
   @impl true
   def handle_info({:state_updated, presentation_state}, socket) do
+    survey_mode_changed = presentation_state.survey_mode != socket.assigns.state.survey_mode
+
+    socket =
+      socket
+      |> assign(:state, presentation_state)
+      |> refresh_survey_interactions(presentation_state.position)
+
+    # When survey mode is toggled, re-resolve the single active interaction so
+    # the non-survey view doesn't keep a stale one.
+    socket =
+      if survey_mode_changed do
+        get_current_interaction(socket, socket.assigns.event, presentation_state.position)
+      else
+        socket
+      end
+
     {:noreply,
      socket
-     |> assign(:state, presentation_state)
-     |> refresh_survey_interactions(presentation_state.position)
      |> stream(:posts, list_posts(socket, socket.assigns.event.uuid), reset: true)}
   end
 
@@ -301,58 +316,72 @@ defmodule ClaperWeb.EventLive.Show do
 
   @impl true
   def handle_info({:poll_updated, %Claper.Polls.Poll{enabled: true} = poll}, socket) do
-    {:noreply,
-     socket
-     |> load_current_interaction(poll, true)
-     |> update_survey_poll(poll)}
+    if socket.assigns.state.survey_mode do
+      {:noreply, socket |> update_survey_poll(poll)}
+    else
+      {:noreply, socket |> load_current_interaction(poll, true)}
+    end
   end
 
   @impl true
-  def handle_info({:poll_deleted, %Claper.Polls.Poll{enabled: true}}, socket) do
+  def handle_info({:poll_deleted, %Claper.Polls.Poll{enabled: true} = poll}, socket) do
     {:noreply,
      socket
+     |> remove_survey_interaction(poll)
      |> update(:current_interaction, fn _current_interaction -> nil end)}
   end
 
   @impl true
   def handle_info({:form_updated, %Claper.Forms.Form{enabled: true} = form}, socket) do
-    {:noreply,
-     socket
-     |> load_current_interaction(form, true)}
+    if socket.assigns.state.survey_mode do
+      {:noreply, socket |> update_survey_interaction(form)}
+    else
+      {:noreply, socket |> load_current_interaction(form, true)}
+    end
   end
 
   @impl true
-  def handle_info({:form_deleted, %Claper.Forms.Form{enabled: true}}, socket) do
+  def handle_info({:form_deleted, %Claper.Forms.Form{enabled: true} = form}, socket) do
     {:noreply,
      socket
+     |> remove_survey_interaction(form)
      |> update(:current_interaction, fn _current_interaction -> nil end)}
   end
 
   @impl true
   def handle_info({:embed_updated, %Claper.Embeds.Embed{enabled: true} = embed}, socket) do
-    {:noreply,
-     socket
-     |> load_current_interaction(embed, true)}
+    if socket.assigns.state.survey_mode do
+      {:noreply, socket |> update_survey_interaction(embed)}
+    else
+      {:noreply, socket |> load_current_interaction(embed, true)}
+    end
   end
 
   @impl true
-  def handle_info({:embed_deleted, %Claper.Embeds.Embed{enabled: true}}, socket) do
+  def handle_info({:embed_deleted, %Claper.Embeds.Embed{enabled: true} = embed}, socket) do
     {:noreply,
      socket
+     |> remove_survey_interaction(embed)
      |> update(:current_interaction, fn _current_interaction -> nil end)}
   end
 
   @impl true
   def handle_info({:quiz_updated, %Claper.Quizzes.Quiz{enabled: true} = quiz}, socket) do
-    {:noreply,
-     socket
-     |> load_current_interaction(quiz, true)}
+    if socket.assigns.state.survey_mode do
+      {:noreply,
+       socket
+       |> update_survey_interaction(quiz)
+       |> load_current_interaction(quiz, true)}
+    else
+      {:noreply, socket |> load_current_interaction(quiz, true)}
+    end
   end
 
   @impl true
-  def handle_info({:quiz_deleted, %Claper.Quizzes.Quiz{enabled: true}}, socket) do
+  def handle_info({:quiz_deleted, %Claper.Quizzes.Quiz{enabled: true} = quiz}, socket) do
     {:noreply,
      socket
+     |> remove_survey_interaction(quiz)
      |> update(:current_interaction, fn _current_interaction -> nil end)}
   end
 
@@ -361,12 +390,22 @@ defmodule ClaperWeb.EventLive.Show do
         {:word_cloud_updated, %WordClouds.WordCloud{enabled: true} = word_cloud},
         socket
       ) do
-    {:noreply, socket |> load_current_interaction(word_cloud, true)}
+    if socket.assigns.state.survey_mode do
+      {:noreply, socket |> update_survey_interaction(word_cloud)}
+    else
+      {:noreply, socket |> load_current_interaction(word_cloud, true)}
+    end
   end
 
   @impl true
-  def handle_info({:word_cloud_deleted, %WordClouds.WordCloud{enabled: true}}, socket) do
-    {:noreply, socket |> update(:current_interaction, fn _current_interaction -> nil end)}
+  def handle_info(
+        {:word_cloud_deleted, %WordClouds.WordCloud{enabled: true} = word_cloud},
+        socket
+      ) do
+    {:noreply,
+     socket
+     |> remove_survey_interaction(word_cloud)
+     |> update(:current_interaction, fn _current_interaction -> nil end)}
   end
 
   @impl true
@@ -671,7 +710,13 @@ defmodule ClaperWeb.EventLive.Show do
   @impl true
   def handle_event("survey-select-poll-opt", %{"opt" => opt, "poll-id" => pid}, socket) do
     poll_id = String.to_integer(pid)
-    poll = Enum.find(socket.assigns.current_interactions, &(&1.id == poll_id))
+
+    poll =
+      Enum.find(
+        socket.assigns.current_interactions,
+        &(match?(%Polls.Poll{}, &1) and &1.id == poll_id)
+      )
+
     selected = Map.get(socket.assigns.selected_poll_opts, poll_id, [])
 
     new_selected =
@@ -1027,9 +1072,36 @@ defmodule ClaperWeb.EventLive.Show do
       |> Enum.filter(&match?(%Polls.Poll{}, &1))
       |> Enum.into(%{}, fn poll -> {poll.id, survey_poll_vote(socket, poll.id)} end)
 
+    form_submits =
+      enriched
+      |> Enum.filter(&match?(%Forms.Form{}, &1))
+      |> Enum.into(%{}, fn form -> {form.id, survey_form_submit(socket, form.id)} end)
+
     socket
     |> assign(:current_interactions, enriched)
     |> assign(:current_poll_votes, votes)
+    |> assign(:current_form_submits, form_submits)
+    |> load_survey_quiz(enriched)
+  end
+
+  # Quiz answering relies on the singular current_interaction state, so when a
+  # quiz is active in survey mode we load the first one through the legacy
+  # path; otherwise current_interaction is cleared so the non-survey fallback
+  # branch never renders a stale interaction. Passing same_interaction when the
+  # quiz is already loaded preserves the attendee's question index and
+  # selections across unrelated broadcasts.
+  defp load_survey_quiz(socket, interactions) do
+    case Enum.find(interactions, &match?(%Quizzes.Quiz{}, &1)) do
+      nil ->
+        assign(socket, :current_interaction, nil)
+
+      quiz ->
+        same =
+          match?(%Quizzes.Quiz{}, socket.assigns[:current_interaction]) and
+            socket.assigns.current_interaction.id == quiz.id
+
+        load_current_interaction(socket, quiz, same)
+    end
   end
 
   # Replaces a single poll inside the survey list (used for live result updates).
@@ -1052,27 +1124,70 @@ defmodule ClaperWeb.EventLive.Show do
     end
   end
 
+  # Replaces any non-poll interaction inside the survey list, matching on both
+  # struct type and id since ids can collide across interaction types.
+  defp update_survey_interaction(socket, interaction) do
+    interactions = socket.assigns[:current_interactions] || []
+
+    updated =
+      Enum.map(interactions, fn existing ->
+        if existing.__struct__ == interaction.__struct__ and existing.id == interaction.id,
+          do: interaction,
+          else: existing
+      end)
+
+    socket |> assign(:current_interactions, updated)
+  end
+
+  defp remove_survey_interaction(socket, interaction) do
+    interactions = socket.assigns[:current_interactions] || []
+
+    updated =
+      Enum.reject(interactions, fn existing ->
+        existing.__struct__ == interaction.__struct__ and existing.id == interaction.id
+      end)
+
+    socket |> assign(:current_interactions, updated)
+  end
+
+  defp survey_form_submit(%{assigns: %{current_user: current_user}}, form_id)
+       when is_map(current_user) do
+    Forms.get_form_submit(current_user.id, form_id)
+  end
+
+  defp survey_form_submit(%{assigns: %{attendee_identifier: attendee_identifier}}, form_id) do
+    Forms.get_form_submit(attendee_identifier, form_id)
+  end
+
   defp survey_vote(socket, poll_id, voter) do
-    poll = Enum.find(socket.assigns.current_interactions, &(&1.id == poll_id))
+    poll =
+      Enum.find(
+        socket.assigns.current_interactions,
+        &(match?(%Polls.Poll{}, &1) and &1.id == poll_id)
+      )
 
-    opts =
-      socket.assigns.selected_poll_opts
-      |> Map.get(poll_id, [])
-      |> Enum.map(fn opt -> Integer.parse(opt) |> elem(0) end)
+    if is_nil(poll) do
+      socket
+    else
+      opts =
+        socket.assigns.selected_poll_opts
+        |> Map.get(poll_id, [])
+        |> Enum.map(fn opt -> Integer.parse(opt) |> elem(0) end)
 
-    poll_opts = Enum.map(opts, fn opt -> Enum.at(poll.poll_opts, opt) end)
+      poll_opts = Enum.map(opts, fn opt -> Enum.at(poll.poll_opts, opt) end)
 
-    case Claper.Polls.vote(voter, socket.assigns.event.uuid, poll_opts, poll_id) do
-      {:ok, voted_poll} ->
-        socket
-        |> assign(
-          :current_poll_votes,
-          Map.put(
-            socket.assigns.current_poll_votes,
-            voted_poll.id,
-            survey_poll_vote(socket, voted_poll.id)
+      case Claper.Polls.vote(voter, socket.assigns.event.uuid, poll_opts, poll_id) do
+        {:ok, voted_poll} ->
+          socket
+          |> assign(
+            :current_poll_votes,
+            Map.put(
+              socket.assigns.current_poll_votes,
+              voted_poll.id,
+              survey_poll_vote(socket, voted_poll.id)
+            )
           )
-        )
+      end
     end
   end
 

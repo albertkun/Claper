@@ -57,13 +57,14 @@ defmodule ClaperWeb.EventLive.Presenter do
         |> assign(:pinned_posts, list_pinned_posts(socket, event.uuid))
         |> assign(:show_only_pinned, event.presentation_file.presentation_state.show_only_pinned)
         |> assign(:reacts, [])
-        |> assign(:current_polls, [])
+        |> assign(:survey_interactions, [])
+        |> assign(:survey_word_frequencies, %{})
         |> poll_at_position
         |> form_at_position
         |> embed_at_position
         |> quiz_at_position
         |> word_cloud_at_position
-        |> survey_polls_at_position
+        |> survey_interactions_at_position
 
       {:ok, socket, temporary_assigns: []}
     end
@@ -120,19 +121,14 @@ defmodule ClaperWeb.EventLive.Presenter do
      |> poll_at_position
      |> embed_at_position
      |> word_cloud_at_position
-     |> survey_polls_at_position}
+     |> survey_interactions_at_position}
   end
 
   @impl true
   def handle_info({:current_interactions, interactions}, socket) do
-    polls =
-      interactions
-      |> Enum.filter(&match?(%Poll{}, &1))
-      |> Enum.map(&Claper.Polls.set_percentages/1)
-
     {:noreply,
      socket
-     |> assign(:current_polls, polls)
+     |> assign_survey_interactions(interactions)
      |> assign(:current_poll, nil)
      |> assign(:current_embed, nil)
      |> assign(:current_form, nil)
@@ -177,9 +173,10 @@ defmodule ClaperWeb.EventLive.Presenter do
   end
 
   @impl true
-  def handle_info({:poll_deleted, _poll}, socket) do
+  def handle_info({:poll_deleted, poll}, socket) do
     {:noreply,
      socket
+     |> update_survey_poll(%{poll | enabled: false})
      |> update(:current_poll, fn _current_poll -> nil end)}
   end
 
@@ -241,23 +238,29 @@ defmodule ClaperWeb.EventLive.Presenter do
   def handle_info({:word_cloud_updated, word_cloud}, socket) do
     word_frequencies = Claper.WordClouds.get_word_frequencies(word_cloud.id)
 
-    if word_cloud.enabled do
-      {:noreply,
-       socket
-       |> assign(:current_word_cloud, word_cloud)
-       |> assign(:word_cloud_frequencies, word_frequencies)}
-    else
-      {:noreply,
-       socket
-       |> assign(:current_word_cloud, nil)
-       |> assign(:word_cloud_frequencies, [])}
+    cond do
+      socket.assigns.state.survey_mode ->
+        {:noreply, socket |> update_survey_word_cloud(word_cloud, word_frequencies)}
+
+      word_cloud.enabled ->
+        {:noreply,
+         socket
+         |> assign(:current_word_cloud, word_cloud)
+         |> assign(:word_cloud_frequencies, word_frequencies)}
+
+      true ->
+        {:noreply,
+         socket
+         |> assign(:current_word_cloud, nil)
+         |> assign(:word_cloud_frequencies, [])}
     end
   end
 
   @impl true
-  def handle_info({:word_cloud_deleted, _word_cloud}, socket) do
+  def handle_info({:word_cloud_deleted, word_cloud}, socket) do
     {:noreply,
      socket
+     |> update_survey_word_cloud(%{word_cloud | enabled: false}, [])
      |> assign(:current_word_cloud, nil)
      |> assign(:word_cloud_frequencies, [])}
   end
@@ -515,39 +518,101 @@ defmodule ClaperWeb.EventLive.Presenter do
     |> assign(:word_cloud_frequencies, word_frequencies)
   end
 
-  # In survey mode, gather every enabled poll at the current position so the
-  # projected view can display them side by side.
-  defp survey_polls_at_position(%{assigns: %{event: event, state: state}} = socket) do
+  # In survey mode, gather every enabled interaction at the current position so
+  # the projected view can display their results side by side.
+  defp survey_interactions_at_position(%{assigns: %{event: event, state: state}} = socket) do
     if state.survey_mode do
-      polls =
-        event
-        |> Claper.Interactions.get_active_interactions(state.position)
-        |> Enum.filter(&match?(%Poll{}, &1))
-        |> Enum.map(&Claper.Polls.set_percentages/1)
-
-      assign(socket, :current_polls, polls)
+      interactions = Claper.Interactions.get_active_interactions(event, state.position)
+      assign_survey_interactions(socket, interactions)
     else
-      assign(socket, :current_polls, [])
+      socket
+      |> assign(:survey_interactions, [])
+      |> assign(:survey_word_frequencies, %{})
     end
   end
 
+  # Keeps polls and word clouds (the types with projectable results) and loads
+  # the word frequencies for each cloud, keyed by id.
+  defp assign_survey_interactions(socket, interactions) do
+    interactions =
+      interactions
+      |> Enum.filter(&(match?(%Poll{}, &1) or match?(%WordCloud{}, &1)))
+      |> Enum.map(fn
+        %Poll{} = poll -> Claper.Polls.set_percentages(poll)
+        other -> other
+      end)
+
+    frequencies =
+      interactions
+      |> Enum.filter(&match?(%WordCloud{}, &1))
+      |> Enum.into(%{}, fn wc -> {wc.id, Claper.WordClouds.get_word_frequencies(wc.id)} end)
+
+    socket
+    |> assign(:survey_interactions, interactions)
+    |> assign(:survey_word_frequencies, frequencies)
+  end
+
   # Replaces a single poll inside the survey list with its updated counterpart.
+  # Matches on struct type as well as id since ids collide across types.
   defp update_survey_poll(socket, poll) do
-    polls = socket.assigns[:current_polls] || []
+    interactions = socket.assigns[:survey_interactions] || []
 
     cond do
-      not Enum.any?(polls, &(&1.id == poll.id)) ->
+      not Enum.any?(interactions, &(match?(%Poll{}, &1) and &1.id == poll.id)) ->
         socket
 
       poll.enabled ->
         assign(
           socket,
-          :current_polls,
-          Enum.map(polls, fn p -> if p.id == poll.id, do: poll, else: p end)
+          :survey_interactions,
+          Enum.map(interactions, fn
+            %Poll{id: id} when id == poll.id -> poll
+            other -> other
+          end)
         )
 
       true ->
-        assign(socket, :current_polls, Enum.reject(polls, &(&1.id == poll.id)))
+        assign(
+          socket,
+          :survey_interactions,
+          Enum.reject(interactions, &(match?(%Poll{}, &1) and &1.id == poll.id))
+        )
+    end
+  end
+
+  # Same as update_survey_poll but for word clouds, also refreshing the
+  # frequencies map used by the projected grid.
+  defp update_survey_word_cloud(socket, word_cloud, word_frequencies) do
+    interactions = socket.assigns[:survey_interactions] || []
+
+    cond do
+      not Enum.any?(interactions, &(match?(%WordCloud{}, &1) and &1.id == word_cloud.id)) ->
+        socket
+
+      word_cloud.enabled ->
+        socket
+        |> assign(
+          :survey_interactions,
+          Enum.map(interactions, fn
+            %WordCloud{id: id} when id == word_cloud.id -> word_cloud
+            other -> other
+          end)
+        )
+        |> assign(
+          :survey_word_frequencies,
+          Map.put(socket.assigns.survey_word_frequencies, word_cloud.id, word_frequencies)
+        )
+
+      true ->
+        socket
+        |> assign(
+          :survey_interactions,
+          Enum.reject(interactions, &(match?(%WordCloud{}, &1) and &1.id == word_cloud.id))
+        )
+        |> assign(
+          :survey_word_frequencies,
+          Map.delete(socket.assigns.survey_word_frequencies, word_cloud.id)
+        )
     end
   end
 

@@ -22,7 +22,7 @@ defmodule ClaperWeb.EventLive.ManagerSettingsComponent do
           <span>{gettext("Interaction")}</span>
         </div>
 
-        <%= case @current_interaction do %>
+        <%= case survey_settings_interaction(@state, @current_interaction) do %>
           <% %Claper.Polls.Poll{} -> %>
             <div class="flex space-x-2 space-y-1.5 items-center mt-1.5">
               <ClaperWeb.Component.Input.check_button
@@ -628,4 +628,16 @@ defmodule ClaperWeb.EventLive.ManagerSettingsComponent do
     </div>
     """
   end
+
+  # In survey mode the poll_visible flag drives the whole projected results
+  # grid (polls and word clouds alike), so surface the poll controls whenever
+  # any interaction is enabled, regardless of its type. Quizzes keep their own
+  # controls since they use per-quiz show_results.
+  defp survey_settings_interaction(%{survey_mode: true}, current_interaction)
+       when not is_nil(current_interaction) and
+              not is_struct(current_interaction, Claper.Quizzes.Quiz) do
+    %Claper.Polls.Poll{}
+  end
+
+  defp survey_settings_interaction(_state, current_interaction), do: current_interaction
 end
