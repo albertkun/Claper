@@ -81,7 +81,7 @@
   <%= if @state.survey_mode && @survey_interactions != [] do %>
     <div
       id="survey"
-      class={"#{if @state.poll_visible, do: "opacity-100", else: "opacity-0"} h-full w-full flex flex-col justify-center bg-black/90 absolute z-30 left-1/2 top-1/2 transform -translate-y-1/2 -translate-x-1/2 p-10 transition-opacity overflow-y-auto"}
+      class="opacity-100 h-full w-full flex flex-col justify-center bg-black/90 absolute z-30 left-1/2 top-1/2 transform -translate-y-1/2 -translate-x-1/2 p-10 transition-opacity overflow-y-auto"
     >
       <div class="w-full md:w-3/4 mx-auto">
         <div class={"grid #{if length(@survey_interactions) > 1, do: "md:grid-cols-2", else: "grid-cols-1"} gap-8"}>
